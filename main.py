@@ -14,6 +14,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -25,6 +26,17 @@ API_SUBSCRIPTION_KEY = os.getenv("API_SUBSCRIPTION_KEY")
 
 app = FastAPI(title="Speech-to-Text API", version="1.0.0")
 
+origins = [
+    "http://localhost:3000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class SarvamClient:
     def __init__(self, url: str):
