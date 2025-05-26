@@ -27,7 +27,8 @@ API_SUBSCRIPTION_KEY = os.getenv("API_SUBSCRIPTION_KEY")
 app = FastAPI(title="Speech-to-Text API", version="1.0.0")
 
 origins = [
-    "https://audioanalyserui.vercel.app/"
+    "https://audioanalyserui.vercel.app/",
+    "https://audioanalyserui.onrender.com"
 ]
 
 app.add_middleware(
