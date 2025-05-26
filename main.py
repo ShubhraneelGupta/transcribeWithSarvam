@@ -26,10 +26,13 @@ API_SUBSCRIPTION_KEY = os.getenv("API_SUBSCRIPTION_KEY")
 
 app = FastAPI(title="Speech-to-Text API", version="1.0.0")
 
+origins = [
+    "https://audioanalyserui.vercel.app/"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ORIGIN"),
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
