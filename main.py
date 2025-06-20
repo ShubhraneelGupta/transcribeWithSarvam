@@ -10,7 +10,7 @@ from azure.storage.filedatalake import ContentSettings
 import mimetypes
 import logging
 from pprint import pprint
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
 import uvicorn
@@ -299,6 +299,124 @@ async def transcribe_audio(files: List[UploadFile] = File(...)):
     except Exception as e:
         logger.error(f"Unexpected error in transcription: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.post("/transcribe/urls", response_model=Dict[str, Any])
+async def transcribe_audio_from_urls(payload: Dict[str, List[str]] = Body(...)):
+    """
+    Accepts list of audio file URLs instead of direct uploads.
+    Downloads, uploads to Azure, triggers job, returns transcription.
+    """
+    file_urls = payload.get("file_urls", [])
+    if not file_urls:
+        raise HTTPException(status_code=400, detail="No file URLs provided")
+
+    logger.info(f"Starting transcription from {len(file_urls)} URLs")
+
+    # Step 1: Initialize the job
+    job_info = await initialize_job()
+    if not job_info:
+        raise HTTPException(status_code=500, detail="Job initialization failed")
+
+    job_id = job_info["job_id"]
+    input_storage_path = job_info["input_storage_path"]
+    output_storage_path = job_info["output_storage_path"]
+
+    # Step 2: Download files to temp and upload
+    temp_files = []
+    try:
+        for url in file_urls:
+            try:
+                logger.info(f"Downloading file from: {url}")
+                resp = requests.get(url, stream=True)
+                if resp.status_code != 200:
+                    raise Exception(f"Failed to download: {url}")
+
+                suffix = os.path.splitext(urlparse(url).path)[-1] or ".wav"
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                for chunk in resp.iter_content(8192):
+                    temp_file.write(chunk)
+                temp_file.close()
+                temp_files.append(temp_file.name)
+            except Exception as e:
+                logger.error(f"Download failed for {url}: {e}")
+
+        if not temp_files:
+            raise HTTPException(status_code=500, detail="Failed to download any files")
+
+        # Upload to Azure
+        client = SarvamClient(input_storage_path)
+        uploaded_count = await client.upload_files(temp_files)
+
+        if uploaded_count == 0:
+            raise HTTPException(status_code=500, detail="File upload failed")
+
+        # Start the job
+        job_start_response = await start_job(job_id)
+        if not job_start_response:
+            raise HTTPException(status_code=500, detail="Failed to start job")
+
+        # Poll for status (same as before)
+        logger.info("Monitoring job status...")
+        attempt = 1
+        max_attempts = 60
+        while attempt <= max_attempts:
+            job_status = await check_job_status(job_id)
+            if not job_status:
+                raise HTTPException(status_code=500, detail="Failed to get job status")
+
+            status = job_status["job_state"]
+            if status == "Completed":
+                break
+            elif status == "Failed":
+                raise HTTPException(status_code=500, detail="Job failed")
+            else:
+                logger.info(f"Waiting... {status} (attempt {attempt})")
+                await asyncio.sleep(10)
+                attempt += 1
+
+        if attempt > max_attempts:
+            raise HTTPException(status_code=408, detail="Job timeout")
+
+        # Step 5: Download transcription results
+        client.update_url(output_storage_path)
+        result_files = await client.list_files()
+        if not result_files:
+            raise HTTPException(status_code=404, detail="No results found")
+
+        final_job_status = await check_job_status(job_id)
+        file_mapping = {
+            detail["file_id"]: detail["file_name"]
+            for detail in final_job_status.get("job_details", [])
+        }
+
+        transcription_results = []
+        for result_file in result_files:
+            try:
+                file_content = await client.download_file_content(result_file)
+                transcription_data = json.loads(file_content.decode('utf-8'))
+                file_id = result_file.split(".")[0]
+                original_filename = file_mapping.get(file_id, f"file_{file_id}")
+
+                transcription_results.append({
+                    "original_filename": original_filename,
+                    "transcription": transcription_data
+                })
+            except Exception as e:
+                logger.error(f"Failed to process result {result_file}: {e}")
+
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "results": transcription_results,
+            "files_processed": len(transcription_results)
+        }
+
+    finally:
+        for temp_file in temp_files:
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
 
 
 @app.get("/health")
