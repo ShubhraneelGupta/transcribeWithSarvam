@@ -137,12 +137,14 @@ class SarvamClient:
 
 
 async def initialize_job():
-    logger.info("Initializing job...")
-    url = "https://api.sarvam.ai/speech-to-text-translate/job/init"
+    print("\n🚀 Initializing job...")
+    url = "https://api.sarvam.ai/speech-to-text/job/init"
     headers = {"API-Subscription-Key": API_SUBSCRIPTION_KEY}
     response = requests.post(url, headers=headers)
-
-    logger.info(f"Initialize Job - Status Code: {response.status_code}")
+    print("\nInitialize Job Response:")
+    print(f"Status Code: {response.status_code}")
+    print("Response Body:")
+    pprint(response.json() if response.status_code == 202 else response.text)
 
     if response.status_code == 202:
         return response.json()
@@ -150,30 +152,36 @@ async def initialize_job():
 
 
 async def check_job_status(job_id):
-    logger.info(f"Checking status for job: {job_id}")
-    url = f"https://api.sarvam.ai/speech-to-text-translate/job/{job_id}/status"
+    print(f"\n🔍 Checking status for job: {job_id}")
+    url = f"https://api.sarvam.ai/speech-to-text/job/{job_id}/status"
     headers = {"API-Subscription-Key": API_SUBSCRIPTION_KEY}
     response = requests.get(url, headers=headers)
-
-    logger.info(f"Job Status - Status Code: {response.status_code}")
+    print("\nJob Status Response:")
+    print(f"Status Code: {response.status_code}")
+    print("Response Body:")
+    pprint(response.json() if response.status_code == 200 else response.text)
 
     if response.status_code == 200:
         return response.json()
     return None
 
 
-async def start_job(job_id):
-    logger.info(f"Starting job: {job_id}")
-    url = "https://api.sarvam.ai/speech-to-text-translate/job"
+async def start_job(job_id, language_code="hi-IN"):
+    print(f"\n▶️ Starting job: {job_id}")
+    url = "https://api.sarvam.ai/speech-to-text/job"
     headers = {
         "API-Subscription-Key": API_SUBSCRIPTION_KEY,
         "Content-Type": "application/json",
     }
-    data = {"job_id": job_id, "job_parameters": {"with_diarization": True, "target_language_code": "hi-IN"}}
+    data = {"job_id": job_id, "job_parameters": {"language_code": language_code}}
+    print("\nRequest Body:")
+    pprint(data)
 
     response = requests.post(url, headers=headers, data=json.dumps(data))
-
-    logger.info(f"Start Job - Status Code: {response.status_code}")
+    print("\nStart Job Response:")
+    print(f"Status Code: {response.status_code}")
+    print("Response Body:")
+    pprint(response.json() if response.status_code == 200 else response.text)
 
     if response.status_code == 200:
         return response.json()
