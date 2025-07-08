@@ -169,7 +169,7 @@ async def start_job(job_id):
         "API-Subscription-Key": API_SUBSCRIPTION_KEY,
         "Content-Type": "application/json",
     }
-    data = {"job_id": job_id, "job_parameters": {"with_diarization": True}}
+    data = {"job_id": job_id, "job_parameters": {"with_diarization": True, "target_language_code": "hi-IN"}}
 
     response = requests.post(url, headers=headers, data=json.dumps(data))
 
