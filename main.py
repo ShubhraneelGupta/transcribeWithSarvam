@@ -173,7 +173,7 @@ async def start_job(job_id, language_code="hi-IN"):
         "API-Subscription-Key": API_SUBSCRIPTION_KEY,
         "Content-Type": "application/json",
     }
-    data = {"job_id": job_id, "job_parameters": {"language_code": language_code, "diarized_transcript":True}}
+    data = {"job_id": job_id, "job_parameters": {"language_code": language_code, "diarization":True}}
     print("\nRequest Body:")
     pprint(data)
 
